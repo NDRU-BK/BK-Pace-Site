@@ -333,6 +333,7 @@ function mount(ctx){
 /*MNT:END*/
   const PAGES=['ca','food','labor','google','ts','pax','rev','rev2','mx','annual','org'];
   const LIM={franchise:1,superviseur:1,directeur:1,adjoint:1,manager:10,shiftleader:10,leader:10};
+  const RESTS=['pace','sg','cesson','cv'];const okRest=l=>Array.isArray(l)?RESTS.filter(k=>l.includes(k)):undefined;/*REST:TPL*/
   const commit=async(users,list,selfId,notice)=>{
     const dir=await encJSON(ctx.k,{users:list,defaults:ctx.dir.defaults||{},access:ACC,maint:MNT});
     if(API){
@@ -372,6 +373,7 @@ function mount(ctx){
     profile:Object.assign({},P,{totp:undefined,tfa:!!P.totp&&P.role!=='admin'}),isAdmin,team,
     can:page=>SU||!Array.isArray(ACC[P.role])||ACC[P.role].includes(page),
     access:()=>JSON.parse(JSON.stringify(ACC)),
+    restaurants:true,
     limits:LIM,
     maint:{get:async()=>{try{const r=await fetch(API+'/maint',{headers:{'x-sess':sget()},cache:'no-store'});return r.ok?await r.json():{error:'http'}}catch(e){return {error:'net'}}},
       set:async(page,msg)=>{try{if(!isAdmin)return {error:'forbidden'};const r=await fetch(API+'/maint',{method:'PUT',headers:{'content-type':'application/json','x-sess':sget()},body:JSON.stringify({pages:{[page]:msg}})});const j=await r.json().catch(()=>({}));return r.ok?j:{error:r.status===403?'forbidden':'http'}}catch(e){return {error:'net'}}}},
@@ -414,6 +416,7 @@ function mount(ctx){
       if(!(await freeId(id)))return {error:'exists'};
       if(LIM[o.role]&&L.filter(x=>x.role===o.role).length>=LIM[o.role])return {error:'role_full'};
       const rec={id,name:(o.name||'').trim()||id,email:(o.email||'').trim(),role:o.role,kind:'user',created:new Date().toISOString().slice(0,10),mustChange:o.temp!==false,phone:''};
+      {const rs=okRest(o.rest);if(rs)rec.rest=rs}
       return commit(D.users.concat(await makeEntry(id,o.pw,ctx.k)),L.concat(rec),P.id,{t:'created',id,pw:o.pw,name:rec.name});
     }),
     update:wrapA(async o=>{
@@ -432,7 +435,7 @@ function mount(ctx){
       const ph2=o.phone===undefined?rec.phone:String(o.phone).trim();if(ph2&&!/^[0-9+().\s-]{6,20}$/.test(ph2))return {error:'bad_phone'};
       const bd2=o.birth===undefined?(rec.birth||''):String(o.birth).trim();if(bd2){const bb=new Date(bd2+'T12:00:00');if(!/^\d{4}-\d{2}-\d{2}$/.test(bd2)||isNaN(bb)||bb>new Date()||bb.getFullYear()<1920)return {error:'bad_birth'}}
       const hd2=o.hired===undefined?(rec.hired||''):String(o.hired).trim();if(hd2){const dd=new Date(hd2+'T12:00:00');if(!/^\d{4}-\d{2}-\d{2}$/.test(hd2)||isNaN(dd)||dd>new Date()||dd.getFullYear()<1960)return {error:'bad_hired'}}
-      const nr=Object.assign({},rec,{id:nid,name:(o.name||'').trim()||rec.name,email:(o.email||'').trim(),phone:ph2||'',hired:hd2,birth:bd2,lang:['fr','en','es'].includes(o.lang)?o.lang:(rec.lang||undefined),role:o.role},av===undefined?{}:{avatar:av},(o.pw&&!me)?{mustChange:o.temp!==false}:{});
+      const nr=Object.assign({},rec,{id:nid,name:(o.name||'').trim()||rec.name,email:(o.email||'').trim(),phone:ph2||'',hired:hd2,birth:bd2,lang:['fr','en','es'].includes(o.lang)?o.lang:(rec.lang||undefined),role:o.role},av===undefined?{}:{avatar:av},(o.pw&&!me)?{mustChange:o.temp!==false}:{},(!me&&okRest(o.rest))?{rest:okRest(o.rest)}:{});
       const list=L.map(x=>x.id===id?nr:x);
       if(!adminsAfter(list))return {error:'last_admin'};
       let users=D.users;
